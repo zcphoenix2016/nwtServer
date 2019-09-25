@@ -273,7 +273,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
 
             auto iter = pServerDlg->m_Contacts.find(nwtHead->m_tarAccount);
             if (iter == pServerDlg->m_Contacts.end()) {
-                strRecv.Format("[ERROR] targetContact没有登录： targetNo = %d", nwtHead->m_tarAccount);
+                strRecv.Format("[ERROR] targetContact没有登录： targetAccount = %d", nwtHead->m_tarAccount);
                 pServerDlg->AppendString(strRecv);
             } else {
                 int retCode = 0;
@@ -282,12 +282,12 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
                 if (0 > retCode)
                 {
                     int errNo = WSAGetLastError();
-                    strRecv.Format("[ERROR] 消息发送失败：targetNo = %d, errNo = %d, targetSock = %d", nwtHead->m_tarAccount, errNo, targetSock);
+                    strRecv.Format("[ERROR] 消息发送失败：targetAccount = %d, errNo = %d, targetSock = %d", nwtHead->m_tarAccount, errNo, targetSock);
                     pServerDlg->AppendString(strRecv);
                 }
                 else
                 {
-                    strRecv.Format("[DEBUG] 消息发送成功：targetNo = %d", nwtHead->m_tarAccount);
+                    strRecv.Format("[DEBUG] 消息发送成功：targetAccount = %d", nwtHead->m_tarAccount);
                     pServerDlg->AppendString(strRecv);
                 }
             }
