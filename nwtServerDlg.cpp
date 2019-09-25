@@ -253,10 +253,10 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             SOCKET contactSock = INVALID_SOCKET;
             auto iter = pServerDlg->m_Contacts.find(nwtHead->m_srcAccount);
             if (iter != pServerDlg->m_Contacts.end()) {
-                strRecv.Format("[WARNING] 客户已登录： contactNo = %d, clientSock = %d", nwtHead->m_srcAccount, contactSock);
+                strRecv.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", nwtHead->m_srcAccount, contactSock);
             } else {
                 //pServerDlg->m_Contacts.insert({ nwtHead->m_srcNo, clientSock });//insert new contact
-                strRecv.Format("[DEBUG] 客户登录成功： contactNo = %d, clientSock = %d", nwtHead->m_srcAccount, clientSock);
+                strRecv.Format("[DEBUG] 客户登录成功： account = %d, clientSock = %d", nwtHead->m_srcAccount, clientSock);
             }
             pServerDlg->m_Contacts[nwtHead->m_srcAccount] = clientSock; //update client sock or insert new contact
             pServerDlg->AppendString(strRecv);
@@ -267,7 +267,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             char* content = new char[nwtHead->m_contentLength + 1];
             memset(content, 0, nwtHead->m_contentLength + 1);
             memcpy(content, buf + sizeof(NwtHeader), nwtHead->m_contentLength);
-            strRecv.Format("[RECV-%d] rval=%d, srcNo=%d, targetNo=%d, contentLength=%d, content=%s",
+            strRecv.Format("[RECV-%d] rval=%d, srcAccount=%d, targetAccount=%d, contentLength=%d, content=%s",
                 clientSock, rval, nwtHead->m_srcAccount, nwtHead->m_tarAccount, nwtHead->m_contentLength, content);
             pServerDlg->AppendString(strRecv);
 
