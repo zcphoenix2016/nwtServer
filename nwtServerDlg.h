@@ -40,7 +40,7 @@ private:
     void AppendString(CString text);
 
 private:
-    UINT m_port = 5555;
+    UINT m_port = 8888;
     SOCKET m_sock = INVALID_SOCKET;
     CWinThread* m_serverThread = NULL;
     BOOL m_running = FALSE;
