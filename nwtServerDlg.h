@@ -35,6 +35,7 @@ protected:
     DECLARE_MESSAGE_MAP()
 
 private:
+    int ServerStartup();
     static UINT ServerProcess(LPVOID lParam);
     static UINT RecvProcess(LPVOID lParam);
     void AppendString(CString text);

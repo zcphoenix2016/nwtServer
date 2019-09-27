@@ -110,62 +110,64 @@ BOOL CnwtServerDlg::OnInitDialog()
     SetIcon(m_hIcon, TRUE);            // 设置大图标
     SetIcon(m_hIcon, FALSE);        // 设置小图标
 
-    // TODO: 在此添加额外的初始化代码
-    //[ZCP] begin
-    CString strText = "", strCaptain = "提示信息";
-    WSAData wsaData;
-    int retCode = WSAStartup(MAKEWORD(1, 1), &wsaData);
-    if (NO_ERROR != retCode)
-    {
-        strText.Format("WSAStartup调用失败！[retCode = %d]", retCode);
-        MessageBox(strText, strCaptain);
+    int retCode = ServerStartup();
+    if (0 > retCode) {
+        CString strText = "[ERROR] ServerStartup调用失败！";
+        MessageBox(strText, "错误提示");
         return FALSE;
     }
 
+    return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+}
+
+int CnwtServerDlg::ServerStartup() {
+    CString strText = "", strCaptain = "提示信息";
+    WSAData wsaData;
+    int retCode = WSAStartup(MAKEWORD(1, 1), &wsaData);
+    if (NO_ERROR != retCode) {
+        strText.Format("WSAStartup调用失败！[retCode = %d]", retCode);
+        MessageBox(strText, strCaptain);
+        return -1;
+    }
+
     m_sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (INVALID_SOCKET == m_sock)
-    {
+    if (INVALID_SOCKET == m_sock) {
         strText.Format("socket初始化失败[sock = %d]", m_sock);
         MessageBox(strText, strCaptain);
-        return FALSE;
+        return -1;
     }
-    
+
     int on = 1;
-    retCode = setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
-    if (0 > retCode)
-    {
+    retCode = setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)& on, sizeof(on));
+    if (0 > retCode) {
         strText.Format("setsockopt调用失败！[retCode = %d]", retCode);
         MessageBox(strText, strCaptain);
-        return FALSE;
+        return -1;
     }
 
     SOCKADDR_IN serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serverAddr.sin_port = htons(m_port);
-    
+
     retCode = bind(m_sock, (SOCKADDR*)& serverAddr, sizeof(serverAddr));
-    if (0 > retCode)
-    {
+    if (0 > retCode) {
         strText.Format("bind调用失败！[retCode = %d]", retCode);
         MessageBox(strText, strCaptain);
-        return FALSE;
+        return -1;
     }
-    
+
     retCode = listen(m_sock, 5);
-    if (0 > retCode)
-    {
+    if (0 > retCode) {
         strText.Format("listen调用失败！[retCode = %d]", retCode);
         MessageBox(strText, strCaptain);
-        return FALSE;
+        return -1;
     }
 
     m_running = TRUE;
     m_serverThread = AfxBeginThread(ServerProcess, this);
 
-    //[ZCP] end
-
-    return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+    return 0;
 }
 
 class RecvProcessParam
@@ -187,11 +189,9 @@ UINT CnwtServerDlg::ServerProcess(LPVOID lParam)
     int len = sizeof(SOCKADDR);
     SOCKET clientSock = INVALID_SOCKET;
     CString strNew = "", strOld = "", strText = "";
-    do
-    {
+    do {
         clientSock = accept(pServerDlg->m_sock, (SOCKADDR*)& clientAddr, &len);
-        if (INVALID_SOCKET == clientSock)
-        {
+        if (INVALID_SOCKET == clientSock) {
             strText.Format("[ERROR] accept调用失败：clientSock = %d", clientSock);
             pServerDlg->AppendString(strText);
             continue;
@@ -213,8 +213,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
     RecvProcessParam* rpp = (RecvProcessParam*)lParam;
     SOCKET clientSock = rpp->m_clientSock;
     CnwtServerDlg* pServerDlg = rpp->m_svrDlg;
-    if (INVALID_SOCKET == clientSock || nullptr == pServerDlg)
-    {
+    if (INVALID_SOCKET == clientSock || nullptr == pServerDlg) {
         AfxMessageBox("invalid client socket or null dlg pointer!");
         return -1;
     }
@@ -222,8 +221,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
     CString strNew = "", strOld = "", strRecv = "";
     char buf[1024] = { 0 };
     int rval = 0;
-    do
-    {
+    do {
         memset(buf, 0, sizeof(buf));
         rval = recv(clientSock, buf, 1024, 0);//TODO: refactor to single function for loop-recv
         if (0 >= rval) {
@@ -248,8 +246,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             break;
         }
         NwtHeader* nwtHead = (NwtHeader*)buf;
-        if (CMD_LOGIN == nwtHead->m_cmd)
-        {
+        if (CMD_LOGIN == nwtHead->m_cmd) {
             SOCKET contactSock = INVALID_SOCKET;
             auto iter = pServerDlg->m_Contacts.find(nwtHead->m_srcAccount);
             if (iter != pServerDlg->m_Contacts.end()) {
@@ -262,8 +259,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             pServerDlg->AppendString(strRecv);
             continue;
         }
-        if (CMD_INSTANT_MSG == nwtHead->m_cmd)
-        {
+        if (CMD_INSTANT_MSG == nwtHead->m_cmd) {
             char* content = new char[nwtHead->m_contentLength + 1];
             memset(content, 0, nwtHead->m_contentLength + 1);
             memcpy(content, buf + sizeof(NwtHeader), nwtHead->m_contentLength);
