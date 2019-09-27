@@ -11,6 +11,16 @@
 #include "NwtHeader.h"
 #include "Commands.h"
 
+#include "User.h"
+
+#include <fstream>
+#include <string>
+#include <vector>
+
+using std::ifstream;
+using std::string;
+using std::vector;
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -117,7 +127,60 @@ BOOL CnwtServerDlg::OnInitDialog()
         return FALSE;
     }
 
+    retCode = LoadUsers("Users.txt");
+    if (0 > retCode) {
+        CString strText = "[ERROR] 加载用户文件调用失败！";
+        MessageBox(strText, "错误提示");
+        return FALSE;
+    }
+
     return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+}
+
+int CnwtServerDlg::LoadUsers(const char* filename) {
+    ifstream users(filename);
+    if (!users) {
+        CString strText = "";
+        strText.Format("[ERROR] 打开用户文件失败： filename = %s", filename);
+        MessageBox(strText, "错误提示");
+        return -1;
+    }
+
+    string line = "";
+    vector<string> vec;
+    string::size_type begin = 0, end = 0;
+    while (getline(users, line)) {
+        for (auto iter = line.begin(); iter != line.end();) { //remove spaces
+            if (' ' == *iter) {
+                iter = line.erase(iter);
+                continue;
+            }
+            iter++;
+        }
+        begin = 0;
+        while (line.size() != begin) {
+            end = line.find(',', begin);
+            vec.push_back(line.substr(begin, end - begin));
+            if (string::npos != end) {
+                begin = end + 1;
+            }
+            else {
+                break;
+            }
+        }
+
+        User user; //TODO: refactor !!!
+        user.m_account = stoi(vec[0]);
+        user.m_nickname = vec[1];
+        user.m_password = vec[2];
+        user.m_email = vec[3];
+        user.m_mobile = vec[4];
+        m_Users[user.m_account] = user;
+
+        vec.clear();
+    }
+
+    return 0;
 }
 
 int CnwtServerDlg::ServerStartup() {
@@ -246,7 +309,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             break;
         }
         NwtHeader* nwtHead = (NwtHeader*)buf;
-        if (CMD_LOGIN == nwtHead->m_cmd) {
+        if (CMD_LOGIN == nwtHead->m_cmd) { //TODO: verify account and password.
             SOCKET contactSock = INVALID_SOCKET;
             auto iter = pServerDlg->m_Contacts.find(nwtHead->m_srcAccount);
             if (iter != pServerDlg->m_Contacts.end()) {

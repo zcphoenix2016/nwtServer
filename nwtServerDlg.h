@@ -5,6 +5,9 @@
 #pragma once
 
 #include <map>
+#include "User.h"
+
+using std::map;
 
 // CnwtServerDlg 对话框
 class CnwtServerDlg : public CDialogEx
@@ -39,6 +42,7 @@ private:
     static UINT ServerProcess(LPVOID lParam);
     static UINT RecvProcess(LPVOID lParam);
     void AppendString(CString text);
+    int LoadUsers(const char* filename);
 
 private:
     UINT m_port = 8888;
@@ -48,5 +52,6 @@ private:
 
 public:
     CEdit m_editMsgs;
-    std::map<unsigned int, unsigned int> m_Contacts;
+    map<unsigned int, unsigned int> m_Contacts;
+    map<unsigned int, User> m_Users;
 };
