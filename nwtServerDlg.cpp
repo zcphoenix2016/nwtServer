@@ -284,6 +284,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
     CString strNew = "", strOld = "", strRecv = "";
     char buf[1024] = { 0 };
     int rval = 0;
+    int retCode = 0;
     do {
         memset(buf, 0, sizeof(buf));
         rval = recv(clientSock, buf, 1024, 0);//TODO: refactor to single function for loop-recv
@@ -309,9 +310,10 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             break;
         }
         NwtHeader* nwtHead = (NwtHeader*)buf;
-        if (CMD_LOGIN == nwtHead->m_cmd) { //TODO: verify account and password.
+        if (CMD_LOGIN_REQ == nwtHead->m_cmd) { //TODO: verify account and password.
+            LoginReq* loginReq = (LoginReq*)buf;
             SOCKET contactSock = INVALID_SOCKET;
-            auto iter = pServerDlg->m_Contacts.find(nwtHead->m_srcAccount);
+            auto iter = pServerDlg->m_Contacts.find(loginReq->m_account);
             if (iter != pServerDlg->m_Contacts.end()) {
                 strRecv.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", nwtHead->m_srcAccount, contactSock);
             } else {
@@ -320,6 +322,26 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             }
             pServerDlg->m_Contacts[nwtHead->m_srcAccount] = clientSock; //update client sock or insert new contact
             pServerDlg->AppendString(strRecv);
+
+            //send LoginRsp
+            LoginRsp loginRsp;
+            loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(loginRsp.m_account) + sizeof(loginRsp.m_result));
+            loginRsp.m_account = loginReq->m_account;
+            loginRsp.m_result = '0'; //TODO: define const values '0'(48) - SUCCESS, '1'(49) - FAIL
+            memset(buf, 0, sizeof(buf));
+            memcpy(buf, &loginRsp, sizeof(LoginRsp));
+            retCode = send(clientSock, buf, sizeof(LoginRsp), 0);
+            if (0 > retCode)
+            {
+                int errNo = WSAGetLastError();
+                strRecv.Format("[ERROR] 消息发送失败：targetSock = %d", clientSock);
+                pServerDlg->AppendString(strRecv);
+            }
+            else
+            {
+                strRecv.Format("[DEBUG] 消息发送成功：targetSock = %d", clientSock);
+                pServerDlg->AppendString(strRecv);
+            }
             continue;
         }
         if (CMD_INSTANT_MSG == nwtHead->m_cmd) {
@@ -335,7 +357,6 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
                 strRecv.Format("[ERROR] targetContact没有登录： targetAccount = %d", nwtHead->m_tarAccount);
                 pServerDlg->AppendString(strRecv);
             } else {
-                int retCode = 0;
                 unsigned int targetSock = iter->second;
                 retCode = send(targetSock, buf, sizeof(NwtHeader) + nwtHead->m_contentLength, 0);
                 if (0 > retCode)
