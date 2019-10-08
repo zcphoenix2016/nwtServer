@@ -309,25 +309,44 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             pServerDlg->AppendString(strRecv);
             break;
         }
+        //TODO: refactor to single function for different msgs
         NwtHeader* nwtHead = (NwtHeader*)buf;
         if (CMD_LOGIN_REQ == nwtHead->m_cmd) { //TODO: verify account and password.
             LoginReq* loginReq = (LoginReq*)buf;
-            SOCKET contactSock = INVALID_SOCKET;
-            auto iter = pServerDlg->m_Contacts.find(loginReq->m_account);
-            if (iter != pServerDlg->m_Contacts.end()) {
-                strRecv.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", nwtHead->m_srcAccount, contactSock);
-            } else {
-                //pServerDlg->m_Contacts.insert({ nwtHead->m_srcNo, clientSock });//insert new contact
-                strRecv.Format("[DEBUG] 客户登录成功： account = %d, clientSock = %d", nwtHead->m_srcAccount, clientSock);
+            unsigned int result = LOGIN_SUCCESS;
+            auto iterUser = pServerDlg->m_Users.find(loginReq->m_account);
+            if (iterUser != pServerDlg->m_Users.end()) {
+                auto iterContact = pServerDlg->m_Contacts.find(loginReq->m_account);
+                if (iterContact != pServerDlg->m_Contacts.end()) {
+                    strRecv.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", loginReq->m_account, iterContact->second);
+                    if (clientSock != iterContact->second) {
+                        pServerDlg->m_Contacts[loginReq->m_account] = clientSock; //update client sock 
+                    }
+                }
+                else {
+                    string password = loginReq->m_password;
+                    if (password != iterUser->second.m_password) {
+                        result = LOGIN_FAIL;
+                        strRecv.Format("[WARNING] 用户密码错误： account = %d, clientSock = %d", loginReq->m_account, clientSock);
+                    }
+                    else {
+                        result = LOGIN_SUCCESS;
+                        pServerDlg->m_Contacts[loginReq->m_account] = clientSock;
+                        strRecv.Format("[DEBUG] 客户登录成功： account = %d, clientSock = %d", loginReq->m_account, clientSock);
+                    }
+                }
             }
-            pServerDlg->m_Contacts[nwtHead->m_srcAccount] = clientSock; //update client sock or insert new contact
+            else { //用户未注册
+                result = LOGIN_FAIL;
+                strRecv.Format("[WARNING] 用户未注册： account = %d, clientSock = %d", loginReq->m_account, clientSock);
+            }
             pServerDlg->AppendString(strRecv);
 
             //send LoginRsp
             LoginRsp loginRsp;
             loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(loginRsp.m_account) + sizeof(loginRsp.m_result));
             loginRsp.m_account = loginReq->m_account;
-            loginRsp.m_result = '0'; //TODO: define const values '0'(48) - SUCCESS, '1'(49) - FAIL
+            loginRsp.m_result = result;
             memset(buf, 0, sizeof(buf));
             memcpy(buf, &loginRsp, sizeof(LoginRsp));
             retCode = send(clientSock, buf, sizeof(LoginRsp), 0);
