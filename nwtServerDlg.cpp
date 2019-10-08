@@ -313,7 +313,8 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
         NwtHeader* nwtHead = (NwtHeader*)buf;
         if (CMD_LOGIN_REQ == nwtHead->m_cmd) { //TODO: verify account and password.
             LoginReq* loginReq = (LoginReq*)buf;
-            unsigned int result = LOGIN_SUCCESS;
+            unsigned int rspCode = LOGIN_SUCCESS;
+            string rspMsg("登录成功");
             auto iterUser = pServerDlg->m_Users.find(loginReq->m_account);
             if (iterUser != pServerDlg->m_Users.end()) {
                 auto iterContact = pServerDlg->m_Contacts.find(loginReq->m_account);
@@ -326,27 +327,30 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
                 else {
                     string password = loginReq->m_password;
                     if (password != iterUser->second.m_password) {
-                        result = LOGIN_FAIL;
+                        rspCode = LOGIN_FAIL;
+                        rspMsg = "密码错误！";
                         strRecv.Format("[WARNING] 用户密码错误： account = %d, clientSock = %d", loginReq->m_account, clientSock);
                     }
                     else {
-                        result = LOGIN_SUCCESS;
+                        rspCode = LOGIN_SUCCESS;
                         pServerDlg->m_Contacts[loginReq->m_account] = clientSock;
                         strRecv.Format("[DEBUG] 客户登录成功： account = %d, clientSock = %d", loginReq->m_account, clientSock);
                     }
                 }
             }
             else { //用户未注册
-                result = LOGIN_FAIL;
-                strRecv.Format("[WARNING] 用户未注册： account = %d, clientSock = %d", loginReq->m_account, clientSock);
+                rspCode = LOGIN_FAIL;
+                rspMsg = "用户没有注册";
+                strRecv.Format("[WARNING] 用户没有注册： account = %d, clientSock = %d", loginReq->m_account, clientSock);
             }
             pServerDlg->AppendString(strRecv);
 
             //send LoginRsp
             LoginRsp loginRsp;
-            loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(loginRsp.m_account) + sizeof(loginRsp.m_result));
+            loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(loginRsp.m_account) + sizeof(loginRsp.m_rspCode));
             loginRsp.m_account = loginReq->m_account;
-            loginRsp.m_result = result;
+            loginRsp.m_rspCode = rspCode;
+            memcpy(&(loginRsp.m_rspMsg), rspMsg.c_str(), sizeof(loginRsp.m_rspMsg));
             memset(buf, 0, sizeof(buf));
             memcpy(buf, &loginRsp, sizeof(LoginRsp));
             retCode = send(clientSock, buf, sizeof(LoginRsp), 0);
