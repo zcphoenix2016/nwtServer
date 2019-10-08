@@ -315,8 +315,10 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             LoginReq* loginReq = (LoginReq*)buf;
             unsigned int rspCode = LOGIN_SUCCESS;
             string rspMsg("登录成功");
+            string nickname("");
             auto iterUser = pServerDlg->m_Users.find(loginReq->m_account);
             if (iterUser != pServerDlg->m_Users.end()) {
+                nickname = iterUser->second.m_nickname;
                 auto iterContact = pServerDlg->m_Contacts.find(loginReq->m_account);
                 if (iterContact != pServerDlg->m_Contacts.end()) {
                     strRecv.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", loginReq->m_account, iterContact->second);
@@ -351,6 +353,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             loginRsp.m_account = loginReq->m_account;
             loginRsp.m_rspCode = rspCode;
             memcpy(&(loginRsp.m_rspMsg), rspMsg.c_str(), sizeof(loginRsp.m_rspMsg));
+            memcpy(&(loginRsp.m_nickname), nickname.c_str(), sizeof(loginRsp.m_nickname));
             memset(buf, 0, sizeof(buf));
             memcpy(buf, &loginRsp, sizeof(LoginRsp));
             retCode = send(clientSock, buf, sizeof(LoginRsp), 0);
