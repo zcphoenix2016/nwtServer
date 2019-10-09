@@ -311,7 +311,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
         }
         //TODO: refactor to single function for different msgs
         NwtHeader* nwtHead = (NwtHeader*)buf;
-        if (CMD_LOGIN_REQ == nwtHead->m_cmd) { //TODO: verify account and password.
+        if (CMD_LOGIN_REQ == nwtHead->m_cmd) {
             LoginReq* loginReq = (LoginReq*)buf;
             unsigned int rspCode = LOGIN_SUCCESS;
             string rspMsg("登录成功");
