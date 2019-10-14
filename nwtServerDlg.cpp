@@ -349,7 +349,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
 
             //send LoginRsp
             LoginRsp loginRsp;
-            loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(loginRsp.m_account) + sizeof(loginRsp.m_rspCode));
+            loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(LoginRsp) - sizeof(NwtHeader));
             loginRsp.m_account = loginReq->m_account;
             loginRsp.m_rspCode = rspCode;
             memcpy(&(loginRsp.m_rspMsg), rspMsg.c_str(), sizeof(loginRsp.m_rspMsg));
