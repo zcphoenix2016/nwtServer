@@ -10,6 +10,7 @@
 
 #include "NwtHeader.h"
 #include "Commands.h"
+#include "NwtBase.h"
 
 #include "User.h"
 
@@ -288,6 +289,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
     do {
         memset(buf, 0, sizeof(buf));
         rval = recv(clientSock, buf, 1024, 0);//TODO: refactor to single function for loop-recv
+        //rval = nwtRecv(clientSock, buf, 1024);//TODO: nwtRecv nwtHeader first ant nwtRecv left according to the contentLength.
         if (0 >= rval) {
             for (auto iter = pServerDlg->m_Contacts.begin(); iter != pServerDlg->m_Contacts.end();) {
                 if (clientSock == iter->second) {
@@ -356,7 +358,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             memcpy(&(loginRsp.m_nickname), nickname.c_str(), sizeof(loginRsp.m_nickname));
             memset(buf, 0, sizeof(buf));
             memcpy(buf, &loginRsp, sizeof(LoginRsp));
-            retCode = send(clientSock, buf, sizeof(LoginRsp), 0);
+            retCode = nwtSend(clientSock, buf, sizeof(LoginRsp));
             if (0 > retCode)
             {
                 int errNo = WSAGetLastError();
@@ -384,7 +386,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
                 pServerDlg->AppendString(strRecv);
             } else {
                 unsigned int targetSock = iter->second;
-                retCode = send(targetSock, buf, sizeof(NwtHeader) + nwtHead->m_contentLength, 0);
+                retCode = nwtSend(targetSock, buf, sizeof(NwtHeader) + nwtHead->m_contentLength);
                 if (0 > retCode)
                 {
                     int errNo = WSAGetLastError();
