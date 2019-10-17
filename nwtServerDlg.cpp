@@ -283,14 +283,13 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
     }
 
     CString strNew = "", strOld = "", strRecv = "";
-    char buf[1024] = { 0 };
-    int rval = 0;
     int retCode = 0;
+    NwtHeader* nwtHead = NULL;
+    void* recv = NULL;
     do {
-        memset(buf, 0, sizeof(buf));
-        rval = recv(clientSock, buf, 1024, 0);//TODO: refactor to single function for loop-recv
-        //rval = nwtRecv(clientSock, buf, 1024);//TODO: nwtRecv nwtHeader first ant nwtRecv left according to the contentLength.
-        if (0 >= rval) {
+        recv = nwtRecv(clientSock);
+        nwtHead = (NwtHeader*)recv;
+        if (NULL == nwtHead) {
             for (auto iter = pServerDlg->m_Contacts.begin(); iter != pServerDlg->m_Contacts.end();) {
                 if (clientSock == iter->second) {
                     shutdown(iter->second, SD_BOTH);
@@ -302,19 +301,13 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
                 }
             }
             int errNo = WSAGetLastError();
-            if (0 > rval) {
-                strRecv.Format("[ERROR] recv()失败： clientSock = %d, errNo = %d", clientSock, errNo);
-            } 
-            else {
-                strRecv.Format("[DEBUG] 客户端关闭链接： clientSock = %d, errNo = %d", clientSock, errNo);
-            }
+            strRecv.Format("[ERROR] recv()失败： clientSock = %d, errNo = %d", clientSock, errNo);
             pServerDlg->AppendString(strRecv);
             break;
         }
         //TODO: refactor to single function for different msgs
-        NwtHeader* nwtHead = (NwtHeader*)buf;
         if (CMD_LOGIN_REQ == nwtHead->m_cmd) {
-            LoginReq* loginReq = (LoginReq*)buf;
+            LoginReq* loginReq = (LoginReq*)nwtHead;
             unsigned int rspCode = LOGIN_SUCCESS;
             string rspMsg("登录成功");
             string nickname("");
@@ -356,9 +349,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
             loginRsp.m_rspCode = rspCode;
             memcpy(&(loginRsp.m_rspMsg), rspMsg.c_str(), sizeof(loginRsp.m_rspMsg));
             memcpy(&(loginRsp.m_nickname), nickname.c_str(), sizeof(loginRsp.m_nickname));
-            memset(buf, 0, sizeof(buf));
-            memcpy(buf, &loginRsp, sizeof(LoginRsp));
-            retCode = nwtSend(clientSock, buf, sizeof(LoginRsp));
+            retCode = nwtSend(clientSock, &loginRsp, sizeof(LoginRsp));
             if (0 > retCode)
             {
                 int errNo = WSAGetLastError();
@@ -375,9 +366,9 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
         if (CMD_INSTANT_MSG == nwtHead->m_cmd) {
             char* content = new char[nwtHead->m_contentLength + 1];
             memset(content, 0, nwtHead->m_contentLength + 1);
-            memcpy(content, buf + sizeof(NwtHeader), nwtHead->m_contentLength);
-            strRecv.Format("[RECV-%d] rval=%d, srcAccount=%d, targetAccount=%d, contentLength=%d, content=%s",
-                clientSock, rval, nwtHead->m_srcAccount, nwtHead->m_tarAccount, nwtHead->m_contentLength, content);
+            memcpy(content, (char*)recv + sizeof(NwtHeader), nwtHead->m_contentLength);
+            strRecv.Format("[RECV-%d] srcAccount=%d, targetAccount=%d, contentLength=%d, content=%s",
+                clientSock, nwtHead->m_srcAccount, nwtHead->m_tarAccount, nwtHead->m_contentLength, content);
             pServerDlg->AppendString(strRecv);
 
             auto iter = pServerDlg->m_Contacts.find(nwtHead->m_tarAccount);
@@ -386,7 +377,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
                 pServerDlg->AppendString(strRecv);
             } else {
                 unsigned int targetSock = iter->second;
-                retCode = nwtSend(targetSock, buf, sizeof(NwtHeader) + nwtHead->m_contentLength);
+                retCode = nwtSend(targetSock, recv, sizeof(NwtHeader) + nwtHead->m_contentLength);
                 if (0 > retCode)
                 {
                     int errNo = WSAGetLastError();
@@ -402,7 +393,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
 
             delete[] content;
         }
-
+        delete[] (char*)recv;
     } while (1);
 
     delete rpp; //allocate by ServerProcess()
