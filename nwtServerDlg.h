@@ -9,6 +9,8 @@
 
 using std::map;
 
+class LoginReq;
+
 // CnwtServerDlg 对话框
 class CnwtServerDlg : public CDialogEx
 {
@@ -43,6 +45,7 @@ private:
     static UINT RecvProcess(LPVOID lParam);
     void AppendString(CString text);
     int LoadUsers(const char* filename);
+    void HandleLoginReq(const LoginReq *loginReq, const unsigned int sock);
 
 private:
     UINT m_port = 8888;

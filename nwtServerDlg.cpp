@@ -184,6 +184,61 @@ int CnwtServerDlg::LoadUsers(const char* filename) {
     return 0;
 }
 
+void CnwtServerDlg::HandleLoginReq(const LoginReq* loginReq, const unsigned int sock) {
+    unsigned int rspCode = LOGIN_SUCCESS;
+    string rspMsg("登录成功");
+    string nickname("");
+    CString strText = "";
+    auto iterUser = m_Users.find(loginReq->m_account);
+    if (iterUser != m_Users.end()) {
+        nickname = iterUser->second.m_nickname;
+        auto iterContact = m_Contacts.find(loginReq->m_account);
+        if (iterContact != m_Contacts.end()) {
+            strText.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", loginReq->m_account, iterContact->second);
+            if (sock != iterContact->second) {
+                m_Contacts[loginReq->m_account] = sock; //update client sock 
+            }
+        }
+        else {
+            string password = loginReq->m_password;
+            if (password != iterUser->second.m_password) {
+                rspCode = LOGIN_FAIL;
+                rspMsg = "密码错误！";
+                strText.Format("[WARNING] 用户密码错误： account = %d, clientSock = %d", loginReq->m_account, sock);
+            }
+            else {
+                rspCode = LOGIN_SUCCESS;
+                m_Contacts[loginReq->m_account] = sock;
+                strText.Format("[DEBUG] 客户登录成功： account = %d, clientSock = %d", loginReq->m_account, sock);
+            }
+        }
+    }
+    else { //用户未注册
+        rspCode = LOGIN_FAIL;
+        rspMsg = "用户没有注册";
+        strText.Format("[WARNING] 用户没有注册： account = %d, clientSock = %d", loginReq->m_account, sock);
+    }
+    AppendString(strText);
+
+    //send LoginRsp
+    LoginRsp loginRsp;
+    loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(LoginRsp) - sizeof(NwtHeader));
+    loginRsp.m_account = loginReq->m_account;
+    loginRsp.m_rspCode = rspCode;
+    memcpy(&(loginRsp.m_rspMsg), rspMsg.c_str(), sizeof(loginRsp.m_rspMsg));
+    memcpy(&(loginRsp.m_nickname), nickname.c_str(), sizeof(loginRsp.m_nickname));
+    int retCode = nwtSend(sock, &loginRsp, sizeof(LoginRsp));
+    if (0 > retCode) {
+        int errNo = WSAGetLastError();
+        strText.Format("[ERROR] 消息发送失败：targetSock = %d", sock);
+        AppendString(strText);
+    }
+    else {
+        strText.Format("[DEBUG] 消息发送成功：targetSock = %d", sock);
+        AppendString(strText);
+    }
+}
+
 int CnwtServerDlg::ServerStartup() {
     CString strText = "", strCaptain = "提示信息";
     WSAData wsaData;
@@ -307,60 +362,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
         }
         //TODO: refactor to single function for different msgs
         if (CMD_LOGIN_REQ == nwtHead->m_cmd) {
-            LoginReq* loginReq = (LoginReq*)nwtHead;
-            unsigned int rspCode = LOGIN_SUCCESS;
-            string rspMsg("登录成功");
-            string nickname("");
-            auto iterUser = pServerDlg->m_Users.find(loginReq->m_account);
-            if (iterUser != pServerDlg->m_Users.end()) {
-                nickname = iterUser->second.m_nickname;
-                auto iterContact = pServerDlg->m_Contacts.find(loginReq->m_account);
-                if (iterContact != pServerDlg->m_Contacts.end()) {
-                    strRecv.Format("[WARNING] 客户已登录： account = %d, clientSock = %d", loginReq->m_account, iterContact->second);
-                    if (clientSock != iterContact->second) {
-                        pServerDlg->m_Contacts[loginReq->m_account] = clientSock; //update client sock 
-                    }
-                }
-                else {
-                    string password = loginReq->m_password;
-                    if (password != iterUser->second.m_password) {
-                        rspCode = LOGIN_FAIL;
-                        rspMsg = "密码错误！";
-                        strRecv.Format("[WARNING] 用户密码错误： account = %d, clientSock = %d", loginReq->m_account, clientSock);
-                    }
-                    else {
-                        rspCode = LOGIN_SUCCESS;
-                        pServerDlg->m_Contacts[loginReq->m_account] = clientSock;
-                        strRecv.Format("[DEBUG] 客户登录成功： account = %d, clientSock = %d", loginReq->m_account, clientSock);
-                    }
-                }
-            }
-            else { //用户未注册
-                rspCode = LOGIN_FAIL;
-                rspMsg = "用户没有注册";
-                strRecv.Format("[WARNING] 用户没有注册： account = %d, clientSock = %d", loginReq->m_account, clientSock);
-            }
-            pServerDlg->AppendString(strRecv);
-
-            //send LoginRsp
-            LoginRsp loginRsp;
-            loginRsp.m_head = NwtHeader(CMD_LOGIN_RSP, 0, loginReq->m_account, sizeof(LoginRsp) - sizeof(NwtHeader));
-            loginRsp.m_account = loginReq->m_account;
-            loginRsp.m_rspCode = rspCode;
-            memcpy(&(loginRsp.m_rspMsg), rspMsg.c_str(), sizeof(loginRsp.m_rspMsg));
-            memcpy(&(loginRsp.m_nickname), nickname.c_str(), sizeof(loginRsp.m_nickname));
-            retCode = nwtSend(clientSock, &loginRsp, sizeof(LoginRsp));
-            if (0 > retCode)
-            {
-                int errNo = WSAGetLastError();
-                strRecv.Format("[ERROR] 消息发送失败：targetSock = %d", clientSock);
-                pServerDlg->AppendString(strRecv);
-            }
-            else
-            {
-                strRecv.Format("[DEBUG] 消息发送成功：targetSock = %d", clientSock);
-                pServerDlg->AppendString(strRecv);
-            }
+            pServerDlg->HandleLoginReq((LoginReq*)nwtHead, clientSock);
             continue;
         }
         if (CMD_INSTANT_MSG == nwtHead->m_cmd) {
