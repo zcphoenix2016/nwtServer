@@ -239,30 +239,31 @@ void CnwtServerDlg::HandleLoginReq(const LoginReq* loginReq, const unsigned int 
     }
 }
 
-void CnwtServerDlg::HandleInstantMsg(const NwtHeader* nwtHead, const unsigned int sock) {
-    char* content = new char[nwtHead->m_contentLength + 1];
-    memset(content, 0, nwtHead->m_contentLength + 1);
-    memcpy(content, (char*)nwtHead + sizeof(NwtHeader), nwtHead->m_contentLength);
+void CnwtServerDlg::HandleInstantMsg(const InstantMsg* im, const unsigned int sock) {
+    char* content = new char[im->m_head.m_contentLength + 1];
+    memset(content, 0, im->m_head.m_contentLength + 1);
+    memcpy(content, im->m_content, im->m_head.m_contentLength);
     CString strInfo = "";
     strInfo.Format("[RECV-%d] srcAccount=%d, targetAccount=%d, contentLength=%d, content=%s",
-        sock, nwtHead->m_srcAccount, nwtHead->m_tarAccount, nwtHead->m_contentLength, content);
+        sock, im->m_head.m_srcAccount, im->m_head.m_tarAccount, im->m_head.m_contentLength, content);
     AppendString(strInfo);
 
-    auto iter = m_Contacts.find(nwtHead->m_tarAccount);
+    auto iter = m_Contacts.find(im->m_head.m_tarAccount);
     if (iter == m_Contacts.end()) {
-        strInfo.Format("[ERROR] targetContact没有登录： targetAccount = %d", nwtHead->m_tarAccount);
+        strInfo.Format("[ERROR] targetContact没有登录： targetAccount = %d", im->m_head.m_tarAccount);
         AppendString(strInfo);
     }
     else {
         unsigned int targetSock = iter->second;
-        int retCode = nwtSend(targetSock, (void*)nwtHead, sizeof(NwtHeader) + nwtHead->m_contentLength);
+        int retCode = nwtSend(targetSock, (void*)im, sizeof(NwtHeader) + im->m_head.m_contentLength);
         if (0 > retCode) {
             int errNo = WSAGetLastError();
-            strInfo.Format("[ERROR] 消息发送失败：targetAccount = %d, errNo = %d, targetSock = %d", nwtHead->m_tarAccount, errNo, targetSock);
+            strInfo.Format("[ERROR] 消息发送失败：targetAccount = %d, errNo = %d, targetSock = %d", 
+                im->m_head.m_tarAccount, errNo, targetSock);
             AppendString(strInfo);
         }
         else {
-            strInfo.Format("[DEBUG] 消息发送成功：targetAccount = %d", nwtHead->m_tarAccount);
+            strInfo.Format("[DEBUG] 消息发送成功：targetAccount = %d", im->m_head.m_tarAccount);
             AppendString(strInfo);
         }
     }
@@ -369,7 +370,6 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
     }
 
     CString strInfo = "";
-    //int retCode = 0;
     NwtHeader* nwtHead = NULL;
     void* recv = NULL;
     do {
@@ -397,7 +397,7 @@ UINT CnwtServerDlg::RecvProcess(LPVOID lParam)
         }
 
         if (CMD_INSTANT_MSG == nwtHead->m_cmd) {
-            pServerDlg->HandleInstantMsg(nwtHead, clientSock);
+            pServerDlg->HandleInstantMsg((InstantMsg*)nwtHead, clientSock);
         }
 
         delete[] (char*)recv;

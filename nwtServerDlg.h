@@ -10,7 +10,7 @@
 using std::map;
 
 class LoginReq;
-class NwtHeader;
+class InstantMsg;
 
 // CnwtServerDlg 对话框
 class CnwtServerDlg : public CDialogEx
@@ -47,7 +47,7 @@ private:
     void AppendString(CString text);
     int LoadUsers(const char* filename);
     void HandleLoginReq(const LoginReq *loginReq, const unsigned int sock);
-    void HandleInstantMsg(const NwtHeader* nwtHead, const unsigned int sock);
+    void HandleInstantMsg(const InstantMsg* im, const unsigned int sock);
 
 private:
     UINT m_port = 8888;
